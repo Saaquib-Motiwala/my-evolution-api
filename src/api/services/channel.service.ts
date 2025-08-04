@@ -497,6 +497,11 @@ export class ChannelStartupService {
 
     const where = {
       instanceId: this.instanceId,
+      // Add condition to only get saved contacts
+      OR: [
+        { pushName: { not: null } },
+        { profilePicUrl: { not: null } }
+      ]
     };
 
     if (remoteJid) {
@@ -818,6 +823,102 @@ export class ChannelStartupService {
 
     return [];
   }
+
+  public async searchChats(query: any) {
+    const remoteJid = query?.where?.remoteJid
+      ? query?.where?.remoteJid.includes('@')
+        ? query.where?.remoteJid
+        : createJid(query.where?.remoteJid)
+      : null;
+
+    // Extract search text from query
+    const searchText = query?.where?.searchText?.trim() || '';
+    
+    // Return empty array if search text is less than 3 characters
+    if (searchText && searchText.length < 3) {
+      return [];
+    }
+
+    // Build WHERE conditions
+    const whereConditions = [
+      Prisma.sql`c."instanceId" = ${this.instanceId}`,
+      Prisma.sql`co."instanceId" = ${this.instanceId}`
+    ];
+
+    if (remoteJid) {
+      whereConditions.push(Prisma.sql`c."remoteJid" = ${remoteJid}`);
+    }
+
+    // Add filter for individual chats (s.whatsapp.net) if needed
+    if (query?.where?.individualChatsOnly) {
+      whereConditions.push(Prisma.sql`c."remoteJid" LIKE '%s.whatsapp.net'`);
+    }
+
+    // Add timestamp filter if provided
+    if (query?.where?.messageTimestamp?.gte && query?.where?.messageTimestamp?.lte) {
+      whereConditions.push(
+        Prisma.sql`c."updatedAt" >= ${new Date(query.where.messageTimestamp.gte)}`,
+        Prisma.sql`c."updatedAt" <= ${new Date(query.where.messageTimestamp.lte)}`
+      );
+    }
+
+    // Build search filter for text search
+    if (searchText) {
+      whereConditions.push(
+        Prisma.sql`(
+          LOWER(
+            CASE 
+              WHEN c."name" IS NOT NULL AND c."name" != '' THEN c."name"
+              WHEN co."pushName" IS NOT NULL AND co."pushName" != '' THEN co."pushName"
+              ELSE co."remoteJid"
+            END
+          ) ILIKE ${`%${searchText.toLowerCase()}%`}
+        )`
+      );
+    }
+
+    const whereClause = whereConditions.length > 0 
+      ? Prisma.sql`WHERE ${Prisma.join(whereConditions, ' AND ')}`
+      : Prisma.sql``;
+
+    const limit = query?.take ? Prisma.sql`LIMIT ${query.take}` : Prisma.sql``;
+    const offset = query?.skip ? Prisma.sql`OFFSET ${query.skip}` : Prisma.sql``;
+
+    const results = await this.prismaRepository.$queryRaw`
+      WITH ChatContactData AS (
+        SELECT 
+          c."remoteJid",
+          CASE 
+            WHEN c."name" IS NOT NULL AND c."name" != '' THEN c."name"
+            WHEN co."pushName" IS NOT NULL AND co."pushName" != '' THEN co."pushName"
+            ELSE co."remoteJid"
+          END AS "displayName"
+        FROM public."Chat" c
+        JOIN public."Contact" co ON c."remoteJid" = co."remoteJid" 
+          AND c."instanceId" = co."instanceId"
+        ${whereClause}
+      )
+      SELECT * FROM ChatContactData
+      ORDER BY "displayName"
+      ${limit}
+      ${offset};
+    `;
+
+    if (results && isArray(results) && results.length > 0) {
+      const mappedResults = results.map((row) => {
+        return {
+          remoteJid: row.remoteJid,
+          displayName: row.displayName
+        };
+      });
+
+      return mappedResults;
+    }
+
+    return [];
+  }
+
+
 
   public hasValidMediaContent(message: any): boolean {
     if (!message?.message) return false;

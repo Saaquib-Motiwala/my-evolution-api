@@ -1,8 +1,9 @@
 services:
   
   api:
-    container_name: evolution_api
-    image: evoapicloud/evolution-api:latest
+    container_name: evolution_api_pro
+    # image: evoapicloud/evolution-api:latest
+    build: .
     restart: always
     depends_on:
       - redis
@@ -47,9 +48,9 @@ services:
     ports:
       - 5432:5432
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=pass
-      - POSTGRES_DB=evolution_db
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=clezid
+      - POSTGRES_DB=evolution
       - POSTGRES_HOST_AUTH_METHOD=trust
     volumes:
     - postgres_data:/var/lib/postgresql/data

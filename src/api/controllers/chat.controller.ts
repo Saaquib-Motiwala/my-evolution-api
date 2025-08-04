@@ -70,6 +70,10 @@ export class ChatController {
     return await this.waMonitor.waInstances[instanceName].fetchChats(query);
   }
 
+  public async searchChats({ instanceName }: InstanceDto, query: Query<Contact>) {
+    return await this.waMonitor.waInstances[instanceName].searchChats(query);
+  }
+
   public async findChatByRemoteJid({ instanceName }: InstanceDto, remoteJid: string) {
     return await this.waMonitor.waInstances[instanceName].findChatByRemoteJid(remoteJid);
   }

@@ -6,7 +6,7 @@
   "type": "commonjs",
   "scripts": {
     "build": "npm run db:generate && tsc --noEmit && tsup",
-    "start": "npx prisma generate --schema=prisma/postgresql-schema.prisma && tsx ./src/main.ts",
+    "start": "npx prisma migrate deploy --schema=prisma/postgresql-schema.prisma && npx prisma generate --schema=prisma/postgresql-schema.prisma && tsx ./src/main.ts",
     "start:prod": "npx prisma generate --schema=prisma/postgresql-schema.prisma && node dist/main",
     "dev:server": "tsx watch ./src/main.ts",
     "test": "tsx watch ./test/all.test.ts",
